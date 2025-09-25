@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Resume Parser & Job Notifier</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif; background: #f5f7fa; margin: 0; padding: 20px;
+      display: flex; justify-content: center; align-items: flex-start; min-height: 100vh;
+    }
+    .container {
+      background: white; width: 600px; padding: 30px; border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    h1 { text-align: center; color: #333; margin-bottom: 30px; }
+    h2 { margin-top: 25px; color: #444; border-left: 5px solid #0073e6; padding-left: 10px; }
+    .section {
+        margin-top: 20px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;
+    }
+    input[type="file"], input[type="text"], input[type="email"], input[type="password"] {
+      width: 95%; padding: 10px; margin: 10px 0; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 14px;
+    }
+    button {
+      padding: 12px 20px; background: #0073e6; color: white; border: none;
+      border-radius: 8px; cursor: pointer; font-size: 15px; margin-top: 10px; transition: background 0.3s;
+    }
+    button:hover { background: #005bb5; }
+    .result {
+      margin-top: 15px; padding: 12px; border-radius: 8px;
+      font-size: 14px; display: none;
+    }
+    .success { background: #e6f9f0; color: #2d8a5d; border: 1px solid #2d8a5d; }
+    .error { background: #fdecea; color: #d93025; border: 1px solid #d93025; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📄 Resume Parser & 🚀 Job Notifier</h1>
+
+    <div id="candidateSection" class="section">
+      <h2>Candidate: Upload Resume</h2>
+      <input type="file" id="resume" />
+      <button onclick="uploadResume()">Upload Resume</button>
+      <div id="uploadResult" class="result"></div>
+    </div>
+
+    <div id="hrLoginSection" class="section">
+      <h2>HR Login</h2>
+      <input type="email" id="hrEmail" placeholder="Enter Your Email" />
+      <input type="password" id="hrPassword" placeholder="Enter HR Password" />
+      <button onclick="hrLogin()">Login</button>
+      <div id="loginResult" class="result"></div>
+    </div>
+
+    <div id="hrSection" class="section hidden">
+      <h2>HR: Post a Job</h2>
+      <input type="text" id="jobTitle" placeholder="Enter Job Title" />
+      <input type="text" id="skills" placeholder="Enter Required Skills (comma-separated)" />
+      <button onclick="postJob()">Send Job Notification</button>
+      <div id="jobResult" class="result"></div>
+    </div>
+  </div>
+
+  <script>
+    
+    const API_ENDPOINT = "https://wcag5nnkvc.execute-api.ap-south-1.amazonaws.com/Prod";
+
+    async function uploadResume() {
+      const file = document.getElementById("resume").files[0];
+      const resultBox = document.getElementById("uploadResult");
+      if (!file) {
+        showMessage(resultBox, "Please choose a file first!", "error");
+        return;
+      }
+      try {
+        const response = await fetch(API_ENDPOINT + "/get-presigned-url", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file_name: file.name })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to get upload URL.');
+        
+        await fetch(data.uploadURL, { method: "PUT", body: file, headers: {'Content-Type': 'application/pdf'} });
+        showMessage(resultBox, "✅ Resume uploaded successfully!", "success");
+      } catch (err) {
+        showMessage(resultBox, "❌ Error uploading resume: " + err.message, "error");
+      }
+    }
+
+    function hrLogin() {
+      const password = document.getElementById("hrPassword").value;
+      const loginResult = document.getElementById("loginResult");
+      const hrSection = document.getElementById("hrSection");
+      const candidateSection = document.getElementById("candidateSection");
+      const hrLoginSection = document.getElementById("hrLoginSection");
+
+      if (password === "hrpassword") {
+        showMessage(loginResult, "✅ HR login successful!", "success");
+        hrSection.classList.remove("hidden");
+        // Hide the other sections for a dedicated HR view
+        candidateSection.classList.add("hidden");
+        hrLoginSection.classList.add("hidden");
+      } else {
+        showMessage(loginResult, "❌ Incorrect password!", "error");
+        hrSection.classList.add("hidden");
+      }
+    }
+
+    async function postJob() {
+      const jobTitle = document.getElementById("jobTitle").value;
+      const skills = document.getElementById("skills").value;
+      const resultBox = document.getElementById("jobResult");
+      if (!jobTitle || !skills) {
+        showMessage(resultBox, "Please fill in both Job Title and Skills!", "error");
+        return;
+      }
+      try {
+        const response = await fetch(API_ENDPOINT + "/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_title: jobTitle, skills: skills })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to post job.');
+
+        showMessage(resultBox, "✅ " + data.message, "success");
+      } catch (err) {
+        showMessage(resultBox, "❌ Error posting job: " + err.message, "error");
+      }
+    }
+
+    function showMessage(element, message, type) {
+      element.textContent = message;
+      element.className = "result " + type;
+      element.style.display = "block";
+    }
+  </script>
+</body>
+</html>
